@@ -10,10 +10,27 @@ services:
       - ${DOCKER_WORKDIR}:/app
     environment:
       REDIS_URL: "redis://user:pass@redis:6379"
+    networks:
+      stateful_proxy_network:
+        ipv4_address: 172.20.0.3
     depends_on:
-      - redis
+      redis:
+        condition: service_healthy
 
   redis:
     image: redis-cluster
     build:
       context: redis
+    healthcheck:
+       test: ["CMD", "redis-cli", "-c", "-p", "10001", "ping"]
+    sysctls:
+        - net.core.somaxconn=4096
+    networks:
+      stateful_proxy_network:
+        ipv4_address: 172.20.0.2
+
+networks:
+  stateful_proxy_network:
+    ipam:
+      config:
+        - subnet: 172.20.0.0/24

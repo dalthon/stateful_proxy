@@ -2,10 +2,21 @@ package main
 
 import (
 	"fmt"
-	"os"
-	// sp "github.com/dalthon/statefull_proxy"
+	"time"
+
+	redis "github.com/go-redis/redis"
 )
 
 func main() {
-	fmt.Println("REDIS_URL:", os.Getenv("REDIS_URL"))
+	cluster := redis.NewClusterClient(&redis.ClusterOptions{
+		Addrs: []string{"redis:10001", "redis:10002", "redis:10003"},
+	})
+
+	cluster.Set("123", "456", 20*time.Second).Result()
+	result, err := cluster.Get("123").Result()
+	if err != nil {
+		panic(err)
+	}
+
+	fmt.Println("Result:", result)
 }
