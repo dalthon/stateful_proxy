@@ -1,4 +1,4 @@
-FROM redis:6-alpine
+FROM redis:7-alpine
 
 WORKDIR /home/redis
 

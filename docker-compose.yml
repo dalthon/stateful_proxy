@@ -9,7 +9,9 @@ services:
     volumes:
       - ${DOCKER_WORKDIR}:/app
     environment:
-      REDIS_URL: "redis://user:pass@redis:6379"
+      REDIS_URLS: "redis:10001,redis:10002,redis:10003"
+      REDIS_USERNAME: ""
+      REDIS_PASSWORD: ""
     networks:
       stateful_proxy_network:
         ipv4_address: 172.20.0.3
