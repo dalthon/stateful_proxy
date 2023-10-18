@@ -2,7 +2,6 @@ package stateful_proxy
 
 import (
 	"context"
-	"fmt"
 	"sync"
 	"time"
 
@@ -15,7 +14,7 @@ import (
 
 type HandlerFunc = func(http.ResponseWriter, *http.Request)
 
-var deleteIfGivenFunction string = `
+var deleteIfGivenScript string = `
 if redis.call("get", KEYS[1]) == ARGV[1] then
   return redis.call("del", KEYS[1])
 else
@@ -119,6 +118,10 @@ func (proxy *StatefulProxy) serviceLabel() string {
 	return "service:" + proxy.url
 }
 
+func (proxy *StatefulProxy) remoteServiceLabel(url string) string {
+	return "service:" + url
+}
+
 func (proxy *StatefulProxy) partitionLabel(key string) string {
 	return "partition:" + key
 }
@@ -128,7 +131,6 @@ func (proxy *StatefulProxy) heartbeat(duration time.Duration) {
 		if proxy.closed {
 			break
 		}
-		fmt.Println("heartbeat!")
 		proxy.cluster.Set(proxy.ctx, proxy.serviceLabel(), 1, 3*duration)
 		time.Sleep(duration)
 	}
@@ -156,10 +158,21 @@ func (proxy *StatefulProxy) partitionUrl(partitionKey string, duration time.Dura
 }
 
 func (proxy *StatefulProxy) isRemoteUp(url string) bool {
-	return true
+	_, err := proxy.cluster.Get(proxy.ctx, proxy.remoteServiceLabel(url)).Result()
+	return err != redis.Nil
 }
 
 func (proxy *StatefulProxy) cleanRemoteLock(partitionKey, partitionUrl string) {
+	result, err := proxy.cluster.Eval(
+		proxy.ctx,
+		deleteIfGivenScript,
+		[]string{proxy.partitionLabel(partitionKey)},
+		partitionUrl,
+	).Result()
+
+	if err != nil {
+		panic(err)
+	}
 }
 
 func (proxy *StatefulProxy) remoteCall(stringUrl string, w http.ResponseWriter, r *http.Request) {
