@@ -1,4 +1,4 @@
-package statefull_proxy
+package stateful_proxy
 
 import (
 	"testing"

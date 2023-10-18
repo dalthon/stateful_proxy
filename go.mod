@@ -1,4 +1,4 @@
-module github.com/dalthon/statefull_proxy
+module github.com/dalthon/stateful_proxy
 
 go 1.21
 

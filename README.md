@@ -14,7 +14,7 @@ It relies on a Redis Cluster to store routes.
 ## Install
 
 ```sh
-go get github.com/dalthon/statefull_proxy
+go get github.com/dalthon/stateful_proxy
 ```
 
 ## Usage
@@ -23,7 +23,7 @@ go get github.com/dalthon/statefull_proxy
 package main
 
 import (
-	sp "github.com/dalthon/statefull_proxy"
+	sp "github.com/dalthon/stateful_proxy"
 
 	"net/http"
 )
@@ -50,6 +50,6 @@ To run a full featured example available at [examples/01-simple.go][example], ru
 
 This project is released under the [MIT License][license]
 
-[api-reference]: https://pkg.go.dev/github.com/dalthon/statefull_proxy
+[api-reference]: https://pkg.go.dev/github.com/dalthon/stateful_proxy
 [example]:       examples/01-simple.go
 [makefile]:      Makefile
