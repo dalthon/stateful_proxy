@@ -25,9 +25,17 @@ build :## Builds docker image
 	SERVICE_NAME=$(SERVICE_NAME) DOCKER_WORKDIR=$(DOCKER_WORKDIR) docker compose build
 .PHONY: build
 
+shell-with-ports: ## Runs shell inside container with port exposed
+	@$(call docker_run,$(SERVICE_NAME),$@,$(SH),-p $(PORT):$(PORT))
+.PHONY: shell-with-ports
+
 shell: ## Runs shell inside container
 	@$(call docker_run,$(SERVICE_NAME),$@,$(SH))
 .PHONY: shell
+
+redis-cli: ## Runs redis-cli connected to cluster
+	@$(DOCKER_RUN) redis-cli redis-cli -c -h redis -p 10001
+.PHONY: redis-cli
 
 redis: ## Run
 	@$(DOCKER_COMPOSE) up redis

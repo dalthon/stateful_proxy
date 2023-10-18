@@ -23,6 +23,10 @@ services:
     image: redis-cluster
     build:
       context: redis
+    ports:
+      - 10001:10001
+      - 10002:10002
+      - 10003:10003
     healthcheck:
        test: ["CMD", "redis-cli", "-c", "-p", "10001", "ping"]
     sysctls:
@@ -30,6 +34,12 @@ services:
     networks:
       stateful_proxy_network:
         ipv4_address: 172.20.0.2
+
+  redis-cli:
+    image: redis:alpine
+    networks:
+      stateful_proxy_network:
+        ipv4_address: 172.20.0.4
 
 networks:
   stateful_proxy_network:
