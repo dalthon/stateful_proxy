@@ -23,12 +23,15 @@ func main() {
 
 	url := "http://" + os.Getenv("HOSTNAME") + ":3000"
 
-	proxy := sp.New(cluster, url)
+	heartbeatDuration := 10 * time.Second
+	proxy := sp.New(cluster, url, heartbeatDuration, &sp.Config{})
 
-	duration := 10 * time.Second
+	config := &sp.Config{
+		Duration: 30 * time.Second,
+	}
 
-	http.HandleFunc("/", proxy.Middleware(getRoot, duration))
-	http.HandleFunc("/hello", proxy.Middleware(getHello, duration))
+	http.HandleFunc("/", proxy.Middleware(getRoot, config))
+	http.HandleFunc("/hello", proxy.Middleware(getHello, config))
 
 	fmt.Println("Starting ", url)
 	if err := http.ListenAndServe(":3000", nil); err != nil {

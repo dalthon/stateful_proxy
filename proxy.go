@@ -12,7 +12,7 @@ import (
 	redis "github.com/redis/go-redis/v9"
 )
 
-type HandlerFunc = func(http.ResponseWriter, *http.Request)
+type handlerFunc = func(http.ResponseWriter, *http.Request)
 
 var deleteIfGivenScript string = `
 if redis.call("get", KEYS[1]) == ARGV[1] then
@@ -22,40 +22,56 @@ else
 end
 `
 
-type StatefulProxy struct {
-	closed       bool
-	cluster      *redis.ClusterClient
-	url          string
-	ctx          context.Context
-	keys         map[string]bool
-	lock         sync.Mutex
-	partitionKey func(http.ResponseWriter, *http.Request) string
+var defaultDuration time.Duration = 30 * time.Second
+
+type Config struct {
+	PartitionKey func(http.ResponseWriter, *http.Request) string
+	Duration     time.Duration
 }
 
-func New(cluster *redis.ClusterClient, stringUrl string) *StatefulProxy {
+type StatefulProxy struct {
+	closed  bool
+	cluster *redis.ClusterClient
+	url     string
+	ctx     context.Context
+	keys    map[string]bool
+	lock    sync.Mutex
+	config  *Config
+}
+
+func New(cluster *redis.ClusterClient, stringUrl string, heartbeatDuration time.Duration, config *Config) *StatefulProxy {
 	_, err := url.Parse(stringUrl)
 	if err != nil {
 		panic(err)
 	}
 
-	proxy := &StatefulProxy{
-		closed:       false,
-		cluster:      cluster,
-		url:          stringUrl,
-		ctx:          context.Background(),
-		keys:         map[string]bool{},
-		partitionKey: func(w http.ResponseWriter, r *http.Request) string { return r.Header.Get("X-Partition-Key") },
+	if config == nil {
+		config = &Config{}
 	}
 
-	go proxy.heartbeat(10 * time.Second)
+	proxy := &StatefulProxy{
+		closed:  false,
+		cluster: cluster,
+		url:     stringUrl,
+		ctx:     context.Background(),
+		keys:    map[string]bool{},
+		config:  config,
+	}
+
+	go proxy.heartbeat(heartbeatDuration)
 
 	return proxy
 }
 
-func (proxy *StatefulProxy) Middleware(handleFunc HandlerFunc, duration time.Duration) HandlerFunc {
+func (proxy *StatefulProxy) Middleware(handleFunc handlerFunc, config *Config) handlerFunc {
+	if config == nil {
+		config = &Config{}
+	}
+
 	var fn func(w http.ResponseWriter, r *http.Request)
 	handler := func(w http.ResponseWriter, r *http.Request) {
-		partitionKey := proxy.partitionKey(w, r)
+		partitionKey := proxy.partitionKey(config, w, r)
+		duration := proxy.duration(config)
 		partitionUrl := proxy.partitionUrl(partitionKey, duration)
 
 		if partitionUrl == proxy.url {
@@ -136,6 +152,30 @@ func (proxy *StatefulProxy) heartbeat(duration time.Duration) {
 	}
 }
 
+func (proxy *StatefulProxy) partitionKey(config *Config, w http.ResponseWriter, r *http.Request) string {
+	if config.PartitionKey != nil {
+		return config.PartitionKey(w, r)
+	}
+
+	if proxy.config.PartitionKey != nil {
+		return proxy.config.PartitionKey(w, r)
+	}
+
+	return r.Header.Get("X-Partition-Key")
+}
+
+func (proxy *StatefulProxy) duration(config *Config) time.Duration {
+	if config.Duration != time.Duration(0) {
+		return config.Duration
+	}
+
+	if proxy.config.Duration != time.Duration(0) {
+		return proxy.config.Duration
+	}
+
+	return defaultDuration
+}
+
 func (proxy *StatefulProxy) partitionUrl(partitionKey string, duration time.Duration) string {
 	args := redis.SetArgs{
 		Mode:    "NX",
@@ -163,7 +203,7 @@ func (proxy *StatefulProxy) isRemoteUp(url string) bool {
 }
 
 func (proxy *StatefulProxy) cleanRemoteLock(partitionKey, partitionUrl string) {
-	result, err := proxy.cluster.Eval(
+	_, err := proxy.cluster.Eval(
 		proxy.ctx,
 		deleteIfGivenScript,
 		[]string{proxy.partitionLabel(partitionKey)},
