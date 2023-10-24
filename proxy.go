@@ -25,8 +25,9 @@ end
 var defaultDuration time.Duration = 30 * time.Second
 
 type Config struct {
-	PartitionKey func(http.ResponseWriter, *http.Request) string
-	Duration     time.Duration
+	PartitionKey  func(http.ResponseWriter, *http.Request) string
+	Duration      time.Duration
+	ManualRelease bool
 }
 
 type StatefulProxy struct {
@@ -78,7 +79,9 @@ func (proxy *StatefulProxy) Middleware(handleFunc handlerFunc, config *Config) h
 			label := proxy.partitionLabel(partitionKey)
 			proxy.PartitionHeartbeat(label, duration)
 			handleFunc(w, r)
-			proxy.Release(label)
+			if !config.ManualRelease {
+				proxy.Release(label)
+			}
 			return
 		}
 
